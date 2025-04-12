@@ -17,7 +17,6 @@ FIRE_SPREAD_CHANCE = 0.02  # 2% chance to spread each update
 FIRE_RADIUS = 5
 
 # Screen setup
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Agent Outline")
 clock = pygame.time.Clock()
 FPS = 60
@@ -101,12 +100,19 @@ def load_blueprint(filename):
     return walls, exits, actors, fires
 
 class BlueprintEnvironment:
-    def __init__(self, walls, exits, actors, fires):
+    def __init__(self, walls, exits, actors, fires, screen=None):
         self.walls, self.exits, self.actors = walls, exits, actors
         self.fires = fires
         self.grid = self.compute_occupancy_grid()
-        self.render_on = True  # Default to render enabled
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.render_on = True
+
+        if screen is not None:
+            self.screen = screen
+        else:
+            self.screen = pygame.display.get_surface()
+            if self.screen is None:
+                self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
         pygame.display.set_caption("Hospital Simulation")
 
     def actor_moved(self, actor):
@@ -299,7 +305,15 @@ class BlueprintEnvironment:
         return self.grid[y, x] == 1
 
     def render(self):
-        self.screen = pygame.display.get_surface()
+        if not pygame.get_init():
+            pygame.init()
+        if not pygame.display.get_init():
+            pygame.display.init()
+
+        # Always set a screen if we don't have one!
+        if self.screen is None:
+            self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+
         self.screen.fill(WHITE)
 
         for wall in self.walls:
