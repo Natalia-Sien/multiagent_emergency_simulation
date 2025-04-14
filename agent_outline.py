@@ -4,6 +4,7 @@ import json
 import random
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
+import csv
 
 # Initialization of pygame
 pygame.init()
@@ -105,6 +106,9 @@ class BlueprintEnvironment:
         self.fires = fires
         self.grid = self.compute_occupancy_grid()
         self.render_on = True
+        self.evacuation_times = {"Staff": [], "Adult": [], "Patient": [], "Child": []}
+        self.death_times = {"Staff": [], "Adult": [], "Patient": [], "Child": []}
+
 
         if screen is not None:
             self.screen = screen
@@ -172,8 +176,11 @@ class BlueprintEnvironment:
         self.spread_fire()
         for actor in self.actors[:]:
             if self.actor_in_fire(actor):
+                actor.end_time = pygame.time.get_ticks()
+                self.death_times[actor.actor_type].append((actor.end_time - actor.start_time) / 1000)
                 self.actors.remove(actor)
                 continue
+
             if actor.actor_type == "Child":
                 self.move_child(actor)
             elif actor.actor_type == "Patient":
@@ -183,7 +190,10 @@ class BlueprintEnvironment:
         for actor in self.actors[:]:
             if self.actor_reached_exit(actor):
                 if actor.actor_type != "Patient" or actor.guiding is None:
+                    actor.end_time = pygame.time.get_ticks()
+                    self.evacuation_times[actor.actor_type].append((actor.end_time - actor.start_time) / 1000)
                     self.actors.remove(actor)
+
 
     def actor_in_fire(self, actor):
         for fire in self.fires:
@@ -389,10 +399,34 @@ if __name__ == '__main__':
     walls, exits, actors, fires = load_blueprint(filename)
     env = BlueprintEnvironment(walls, exits, actors, fires)
     running = True
+    
+    start_ticks = pygame.time.get_ticks()
+    for actor in actors:
+        actor.start_time = start_ticks
+
     while running:
         clock.tick(FPS)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+        env.update_actors()
         env.render()
     pygame.quit()
+
+with open("evacuation_results.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["Actor Type", "Status", "Time (s)"])
+    for actor_type in env.evacuation_times:
+        for time in env.evacuation_times[actor_type]:
+            writer.writerow([actor_type, "Evacuated", f"{time:.2f}"])
+    for actor_type in env.death_times:
+        for time in env.death_times[actor_type]:
+            writer.writerow([actor_type, "Burned", f"{time:.2f}"])
+
+print("Results exported to evacuation_results.csv")
+
+print("\n--- Simulation Summary ---")
+for actor_type in env.evacuation_times:
+    evacs = len(env.evacuation_times[actor_type])
+    deaths = len(env.death_times[actor_type])
+    print(f"{actor_type}: {evacs} evacuated, {deaths} burned")
