@@ -2,9 +2,9 @@ import pygame
 import numpy as np
 import json
 import random
+import csv
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
-import csv
 
 # Initialization of pygame
 pygame.init()
@@ -75,6 +75,9 @@ class Actor:
         }.get(actor_type, (0, 0, 0))
 
         self.radius = 8 if actor_type == "Child" else 10
+        # ensure timing metric exists
+        if not hasattr(self, 'start_time'):
+            self.start_time = pygame.time.get_ticks()
 
     def draw(self, screen):
         if self.actor_type == "Patient":
@@ -101,6 +104,10 @@ def load_blueprint(filename):
         constraints=actor.get('constraints'),
         guided_speeds=actor.get('guided_speeds')
     ) for actor in data['actors']]
+    # initialize timing metrics on load
+    start_ticks = pygame.time.get_ticks()
+    for actor in actors:
+        actor.start_time = start_ticks
     fires = [tuple(f["pos"]) for f in data.get("fires", [])]
     return walls, exits, actors, fires
 
@@ -113,6 +120,11 @@ class BlueprintEnvironment:
         self.render_on = True
         self.evacuation_times = {"Staff": [], "Adult": [], "Patient": [], "Child": []}
         self.death_times = {"Staff": [], "Adult": [], "Patient": [], "Child": []}
+
+        # initialize timing for existing actors
+        start_ticks = pygame.time.get_ticks()
+        for actor in self.actors:
+            actor.start_time = start_ticks
 
         if screen is not None:
             self.screen = screen
@@ -132,14 +144,9 @@ class BlueprintEnvironment:
         moves = [(0, -5), (0, 5), (-5, 0), (5, 0), (0, 0), (-5, -5), (5, -5), (-5, 5), (5, 5)]
         move = moves[action]
         new_pos = [actor.pos[0] + move[0], actor.pos[1] + move[1]]
-        print(
-            f"Attempting move for {actor.actor_type} at {actor.pos} with action {action} -> {move}, candidate position: {new_pos}")
         actor.previous_pos = actor.pos[:]
         if not self.detect_collision(actor, new_pos):
             actor.pos = new_pos
-            print(f"Moved {actor.actor_type} to {actor.pos}")
-        else:
-            print(f"Movement blocked for {actor.actor_type} at candidate {new_pos}")
 
     def compute_occupancy_grid(self):
         grid = np.zeros((GRID_HEIGHT, GRID_WIDTH))
@@ -152,12 +159,12 @@ class BlueprintEnvironment:
         return grid
 
     def reset(self, seed=None, options=None):
-        # Slightly randomize actor positions on reset to encourage exploration.
         new_actors = []
         for actor in self.actors:
-            new_pos = [actor.pos[0] + np.random.randint(-3, 4),
-                       actor.pos[1] + np.random.randint(-3, 4)]
-            new_actors.append(Actor(new_pos, actor.actor_type, actor.speed, actor.constraints, actor.guided_speeds))
+            new_pos = [actor.pos[0] + np.random.randint(-3, 4), actor.pos[1] + np.random.randint(-3, 4)]
+            new_actor = Actor(new_pos, actor.actor_type, actor.speed, actor.constraints, actor.guided_speeds)
+            new_actor.start_time = pygame.time.get_ticks()
+            new_actors.append(new_actor)
         self.actors = new_actors
 
     def raycast_distances(self, actor, num_rays=8, max_range=100):
@@ -422,7 +429,7 @@ def open_file_dialog():
 
 if __name__ == '__main__':
     #set this to true to get metrics
-    metrics = True
+    metrics = False
 
     filename = open_file_dialog()
 
