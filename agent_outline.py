@@ -28,13 +28,16 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 ORANGE = (255, 165, 0)
 
+
 class Wall:
     def __init__(self, start, end):
         self.start, self.end = start, end
 
+
 class FireExit:
     def __init__(self, pos, size=(40, 40)):
         self.pos, self.size = pos, size
+
 
 class Actor:
     def __init__(self, pos, actor_type, speed=None, constraints=None, guided_speeds=None):
@@ -85,6 +88,7 @@ class Actor:
         if self.guiding:
             pygame.draw.line(screen, BLACK, self.pos, self.guiding.pos, 2)
 
+
 def load_blueprint(filename):
     with open(filename, 'r') as f:
         data = json.load(f)
@@ -100,6 +104,7 @@ def load_blueprint(filename):
     fires = [tuple(f["pos"]) for f in data.get("fires", [])]
     return walls, exits, actors, fires
 
+
 class BlueprintEnvironment:
     def __init__(self, walls, exits, actors, fires, screen=None):
         self.walls, self.exits, self.actors = walls, exits, actors
@@ -108,7 +113,6 @@ class BlueprintEnvironment:
         self.render_on = True
         self.evacuation_times = {"Staff": [], "Adult": [], "Patient": [], "Child": []}
         self.death_times = {"Staff": [], "Adult": [], "Patient": [], "Child": []}
-
 
         if screen is not None:
             self.screen = screen
@@ -128,7 +132,8 @@ class BlueprintEnvironment:
         moves = [(0, -5), (0, 5), (-5, 0), (5, 0), (0, 0), (-5, -5), (5, -5), (-5, 5), (5, 5)]
         move = moves[action]
         new_pos = [actor.pos[0] + move[0], actor.pos[1] + move[1]]
-        print(f"Attempting move for {actor.actor_type} at {actor.pos} with action {action} -> {move}, candidate position: {new_pos}")
+        print(
+            f"Attempting move for {actor.actor_type} at {actor.pos} with action {action} -> {move}, candidate position: {new_pos}")
         actor.previous_pos = actor.pos[:]
         if not self.detect_collision(actor, new_pos):
             actor.pos = new_pos
@@ -193,7 +198,6 @@ class BlueprintEnvironment:
                     actor.end_time = pygame.time.get_ticks()
                     self.evacuation_times[actor.actor_type].append((actor.end_time - actor.start_time) / 1000)
                     self.actors.remove(actor)
-
 
     def actor_in_fire(self, actor):
         for fire in self.fires:
@@ -305,7 +309,8 @@ class BlueprintEnvironment:
 
     def actor_vision(self, actor, vision_range=5):
         x, y = np.array(actor.pos) // CELL_SIZE
-        return set((x + dx, y + dy) for dx in range(-vision_range, vision_range + 1) for dy in range(-vision_range, vision_range + 1)
+        return set((x + dx, y + dy) for dx in range(-vision_range, vision_range + 1) for dy in
+                   range(-vision_range, vision_range + 1)
                    if 0 <= x + dx < GRID_WIDTH and 0 <= y + dy < GRID_HEIGHT)
 
     def detect_collision(self, actor, new_pos):
@@ -345,6 +350,31 @@ class BlueprintEnvironment:
     def actor_reached_exit(self, actor):
         return any(np.linalg.norm(np.array(actor.pos) - np.array(exit.pos)) < 20 for exit in self.exits)
 
+    def export_metrics(self, csv_path="evacuation_results.csv"):
+        """
+        writes out each actors evacuation or death time to a CSV,
+        and print a summary to the console for debugging
+        """
+
+        #write CSV
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Actor Type", "Status", "Time (s)"])
+            for actor_type, times in self.evacuation_times.items():
+                for t in times:
+                    writer.writerow([actor_type, "Evacuated", f"{t:.2f}"])
+            for actor_type, times in self.death_times.items():
+                for t in times:
+                    writer.writerow([actor_type, "Burned", f"{t:.2f}"])
+
+        print(f"Results exported to {csv_path}\n")
+
+        #summary stats
+        print("--- Simulation Summary ---")
+        for actor_type in self.evacuation_times:
+            evacs = len(self.evacuation_times[actor_type])
+            deaths = len(self.death_times[actor_type])
+            print(f"{actor_type}: {evacs} evacuated, {deaths} burned")
 
 def pygame_file_picker(folder="."):
     import os
@@ -386,11 +416,14 @@ def pygame_file_picker(folder="."):
         clock.tick(30)
 
 
-
 def open_file_dialog():
     return pygame_file_picker()
 
+
 if __name__ == '__main__':
+    #set this to true to get metrics
+    metrics = True
+
     filename = open_file_dialog()
 
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -399,7 +432,7 @@ if __name__ == '__main__':
     walls, exits, actors, fires = load_blueprint(filename)
     env = BlueprintEnvironment(walls, exits, actors, fires)
     running = True
-    
+
     start_ticks = pygame.time.get_ticks()
     for actor in actors:
         actor.start_time = start_ticks
@@ -412,21 +445,6 @@ if __name__ == '__main__':
         env.update_actors()
         env.render()
     pygame.quit()
-
-with open("evacuation_results.csv", "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow(["Actor Type", "Status", "Time (s)"])
-    for actor_type in env.evacuation_times:
-        for time in env.evacuation_times[actor_type]:
-            writer.writerow([actor_type, "Evacuated", f"{time:.2f}"])
-    for actor_type in env.death_times:
-        for time in env.death_times[actor_type]:
-            writer.writerow([actor_type, "Burned", f"{time:.2f}"])
-
-print("Results exported to evacuation_results.csv")
-
-print("\n--- Simulation Summary ---")
-for actor_type in env.evacuation_times:
-    evacs = len(env.evacuation_times[actor_type])
-    deaths = len(env.death_times[actor_type])
-    print(f"{actor_type}: {evacs} evacuated, {deaths} burned")
+    #prints the metrics in a file
+    if metrics:
+        env.export_metrics("evacuation_results.csv")
