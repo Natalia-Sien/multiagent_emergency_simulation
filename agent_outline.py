@@ -2,9 +2,9 @@ import pygame
 import numpy as np
 import json
 import random
-import csv
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
+import csv
 
 # Initialization of pygame
 pygame.init()
@@ -28,22 +28,26 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 ORANGE = (255, 165, 0)
 
-
 class Wall:
     def __init__(self, start, end):
         self.start, self.end = start, end
 
-
 class FireExit:
     def __init__(self, pos, size=(40, 40)):
         self.pos, self.size = pos, size
-
 
 class Actor:
     def __init__(self, pos, actor_type, speed=None, constraints=None, guided_speeds=None):
         self.pos = pos
         self.actor_type = actor_type
         self.guiding = None
+
+        # Track movement history for RL penalty
+        self.previous_pos = pos[:]
+
+        # Track timing for evacuation stats (init to None to avoid RL crash)
+        self.start_time = None
+        self.end_time = None
 
         if speed is None:
             self.speed = {
@@ -75,9 +79,6 @@ class Actor:
         }.get(actor_type, (0, 0, 0))
 
         self.radius = 8 if actor_type == "Child" else 10
-        # ensure timing metric exists
-        if not hasattr(self, 'start_time'):
-            self.start_time = pygame.time.get_ticks()
 
     def draw(self, screen):
         if self.actor_type == "Patient":
