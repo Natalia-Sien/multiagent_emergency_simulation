@@ -1,11 +1,16 @@
 import numpy as np
+import math
+from math import floor
 
 # --------------- parameters that can be tuned to adjust behaviour ---------------
+
+# size of one grid cell in pixels
+CELL_SIZE = 5
 
 # the radius where each boids can influence each other
 Neighbour_Radius = 50
 # the radius that boids will repel each other
-Separation_Radius = 20
+Separation_Radius = 25
 
 # weights for sepeartion alignment and cohesion
 Separation_W = 1
@@ -13,9 +18,14 @@ Alignment_W = 1
 Cohesion_W = 1
 
 # attraction toward nearest exit
-Goal_Attr_W = 2
+Goal_Attr_W = 10
 # avoide nearby fire
-Avoid_Fire_W = 2
+Avoid_Fire_W = 10
+# repulsion from walls
+Avoid_Walls_W = 1.1
+
+# Velocity scaling
+FORCE_SCALE = 0.02
 
 # define each actors speed (units per frame)
 Norm_S = {"Staff":5, "Adult":5,
@@ -63,15 +73,33 @@ def avoid_fire(pos,fires):
             repel += offset/(dist+1e-5)*factor
     return repel
 
+
+# compute a vector that repels the actor away from wall
+def avoid_walls(pos, occ_grid, vision_cells=20):
+    repel = np.zeros(2, float)
+    gx = int(pos[0]//CELL_SIZE)
+    gy = int(pos[1]//CELL_SIZE)
+    for dy in range(-vision_cells,vision_cells+1):
+        for dx in range(-vision_cells, vision_cells+1):
+            nx, ny = gx+dx, gy+dy
+            if 0 <= nx < occ_grid.shape[1] and 0 <= ny < occ_grid.shape[0]:
+                if occ_grid[ny, nx] == 1:
+                    center = np.array(((nx+0.5)*CELL_SIZE,(ny+0.5)*CELL_SIZE),float)
+                    offset = pos - center
+                    dist = np.linalg.norm(offset) + 1e-5
+                    threshold = vision_cells*CELL_SIZE
+                    if dist < threshold:
+                        strength = (threshold-dist)/threshold
+                        repel += (offset/dist)*strength
+    return repel
+
 # checks if hitting a wall
 def is_collision(new_pos, obstacle_grid):
-    from math import floor
-    x_idx = int(floor(new_pos[0] / 5))
-    y_idx = int(floor(new_pos[1] / 5))
-    
+    x_idx = int(floor(new_pos[0] / CELL_SIZE))
+    y_idx = int(floor(new_pos[1] / CELL_SIZE))
     x_idx = max(0, min(obstacle_grid.shape[1]-1, x_idx))
     y_idx = max(0, min(obstacle_grid.shape[0]-1, y_idx))
-    return (obstacle_grid[y_idx, x_idx] == 1)
+    return obstacle_grid[y_idx, x_idx] == 1
 
 
 # -------------------- main function to simulate the actor behaviours --------------------
@@ -92,7 +120,7 @@ def update_actors_boids(actors, exits, fires, obstacle_grid):
             # generates uniformly between the interval -1 and 1
             actor.velocity = np.random.uniform(-1, 1, size=2)
         velocities[actor] = np.array(actor.velocity, dtype=float)
-
+       
     # check neighbor boids
     neighbor_map = {}
     # for each actor find corresponding neighbour actors
@@ -106,6 +134,7 @@ def update_actors_boids(actors, exits, fires, obstacle_grid):
             # considered as neighbour if within defined parameter Neighbour_Radius
             if dist < Neighbour_Radius:
                 neighbor_map[a].append(b)
+
 
     # for each actor, compute behaviour vectors:
     for actor in actors:
@@ -146,17 +175,19 @@ def update_actors_boids(actors, exits, fires, obstacle_grid):
                        Cohesion_W*cohesion_force)
 
         # Goal Attraction
-
         # get the exit position
         exit_pos = find_exit(position_A,exits)
         if exit_pos is not None:
             # compute weighted vector from actor to exit 
             to_goal = exit_pos-position_A
-            boids_force += Goal_Attr_W*to_goal
+            # ensure constant steering strength toward the exit
+            norm = np.linalg.norm(to_goal) + 1e-5
+            boids_force += Goal_Attr_W*(to_goal/norm)
 
         # avoid fire
-        avoid_fire_force = avoid_fire(position_A,fires)
-        boids_force += Avoid_Fire_W*avoid_fire_force
+        boids_force += Avoid_Fire_W*avoid_fire(position_A,fires)
+        # avoid wall
+        boids_force += Avoid_Walls_W*avoid_walls(position_A,obstacle_grid,vision_cells=20)
 
         # if child or patient is near a staff or adult, they can move at guided speed.
         actor_max_speed = Norm_S.get(actor.actor_type, 5)
@@ -171,20 +202,67 @@ def update_actors_boids(actors, exits, fires, obstacle_grid):
                         break
 
         # update actors velocity
-        velocity_new = velocity_A + boids_force*0.01  # scale to damp forces 
+        velocity_new = velocity_A + boids_force*FORCE_SCALE  # scale to damp forces 
         # limit the speed of boids
         speed = np.linalg.norm(velocity_new)
         if speed > actor_max_speed:
             velocity_new = (velocity_new/speed)*actor_max_speed
         velocities[actor] = velocity_new
 
-    # apply the velocities computed to update positions
+    # apply velocities with wall-sliding
     for actor in actors:
-        new_pos = np.array(actor.pos,dtype=float) + velocities[actor]
-        # Check wall collision
-        if not is_collision(new_pos,obstacle_grid):
+        old_pos = np.array(actor.pos, float)
+        v = velocities[actor]
+        new_pos= old_pos + v
+
+        # if no collision, hooray
+        if not is_collision(new_pos, obstacle_grid):
             actor.pos = new_pos.astype(int).tolist()
-            actor.velocity = velocities[actor]
+            actor.velocity = v
         else:
-            # stop movement if collides with wall
-            actor.velocity = np.zeros(2)
+            # find approximate normal from 8 neighbors when hitting a wall
+            gx = int(old_pos[0] // CELL_SIZE)
+            gy = int(old_pos[1] // CELL_SIZE)
+            gx = np.clip(gx, 0, obstacle_grid.shape[1]-1)
+            gy = np.clip(gy, 0, obstacle_grid.shape[0]-1)
+            normal = np.zeros(2,float)
+            for dx, dy in ((1,0), (-1,0), (0,1), (0,-1),
+                           (1,1), (1,-1), (-1,1), (-1,-1)):
+                nx,ny = gx+dx,gy+dy
+                if (0 <= nx < obstacle_grid.shape[1] and 0 <= ny < obstacle_grid.shape[0] and
+                    obstacle_grid[ny, nx] == 1):
+                    # center of that wall cell
+                    center = np.array(((nx+0.5)*CELL_SIZE,(ny+0.5)*CELL_SIZE),float)
+                    normal += (old_pos-center)
+
+            nlen = np.linalg.norm(normal)
+            if nlen > 1e-5:
+                # normalize and compute tangent
+                normal /= nlen
+                tangent = np.array([ normal[1],-normal[0]],float)
+                # project velocity onto the wall tangent
+                slide_v = np.dot(v,tangent)*tangent
+                slide_pos = old_pos + slide_v
+
+                if not is_collision(slide_pos,obstacle_grid):
+                    # if sliding works
+                    actor.pos = slide_pos.astype(int).tolist()
+                    actor.velocity = slide_v
+                else:
+                    # if sliding fails, agent will try axis-aligned movement
+                    vx,vy = v
+                    x_only = np.array([vx, 0], float)
+                    if not is_collision(old_pos+x_only, obstacle_grid):
+                        actor.pos = (old_pos+x_only).astype(int).tolist()
+                        actor.velocity = x_only
+                    else:
+                        y_only = np.array([0.0,vy], float)
+                        if not is_collision(old_pos + y_only, obstacle_grid):
+                            actor.pos = (old_pos+y_only).astype(int).tolist()
+                            actor.velocity = y_only
+                        else:
+                            # completely stuck
+                            actor.velocity = np.zeros(2)
+            else:
+                # no valid normal found
+                actor.velocity = np.zeros(2)
