@@ -94,8 +94,6 @@ class Actor:
         man_dist = abs(a[0] - b[0]) + abs(a[1] - b[1])
         return man_dist
 
-    ##############
-############################################
     def greedy(self, fire_exit, env):
         # def greedy(actor, fire_exit, env):
 
@@ -125,7 +123,7 @@ class Actor:
                     best_move = new_pos
 
         return best_move
-########################################
+###############
 def load_blueprint(filename):
     with open(filename, 'r') as f:
         data = json.load(f)
