@@ -91,22 +91,19 @@ class HospitalMultiAgentEnv(AECEnv):
         }
 
         #construct observation space:
-        # [pos(2), rays(8), exit_vec(2)] + for each target [distance, speed]
-        num_rays = 8
-        num_targets = len(self.rescue_targets)
-        #low/high define bounds per element in observation vector
+        # [pos(2), rays(8), exit_vec(2), nearest_target(8)] = 20 values
         low = np.array(
             [-1.0, -1.0]           #normalized x,y in [-1,1]
-            + [0.0] * num_rays      #ray distances clipped to [0,1]
-            + [-1.0, -1.0]          #exit vector components in [-1,1]
-            + [0.0, 0.0] * num_targets,  #each target distance and speed non-negative
+            + [0.0] * 8            #ray distances clipped to [0,1]
+            + [-1.0, -1.0]         #exit vector components in [-1,1]
+            + [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],  #nearest target features
             dtype=np.float32,
         )
         high = np.array(
             [1.0, 1.0]
-            + [1.0] * num_rays
+            + [1.0] * 8
             + [1.0, 1.0]
-            + [1.0, 1.0] * num_targets,
+            + [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
             dtype=np.float32,
         )
         #assign Box space for each agent
@@ -219,22 +216,41 @@ class HospitalMultiAgentEnv(AECEnv):
         #if actor no longer in env (e.g dead), return zeros
         if actor not in self.env.actors:
             return np.zeros(self.observation_spaces[agent].shape, dtype=np.float32)
+        
         #normalize position by screen dims for network input
         pos = np.array(actor.pos) / np.array([1000, 700])
+        
         #raycast from actor to walls/exits, returns distances up to max range
         rays = self.env.raycast_distances(actor, num_rays=8)
+        
         #vector to nearest exit normalized
         exit_vec = self._nearest_exit_vector(actor)
-        #compute normalized distance and speed for each rescue target
+        
+        #find nearest target and its features
         diag = np.linalg.norm(np.array([1000, 700]))  # diag length of screen
-        features = []
-        for tgt in self.rescue_targets:
-            d = np.linalg.norm(np.array(actor.pos) - np.array(tgt.pos)) / diag
-            s = tgt.speed
-            features.extend([d, s])
+        nearest_target_features = np.zeros(8)  # [pos_x, pos_y, speed, distance, 0, 0, 0, 0]
+        if self.rescue_targets:
+            #find nearest target
+            distances = [np.linalg.norm(np.array(actor.pos) - np.array(tgt.pos)) for tgt in self.rescue_targets]
+            nearest_idx = np.argmin(distances)
+            nearest_target = self.rescue_targets[nearest_idx]
+            
+            #normalize target position
+            target_pos = np.array(nearest_target.pos) / np.array([1000, 700])
+            #normalize distance
+            distance = distances[nearest_idx] / diag
+            #get speed
+            speed = nearest_target.speed
+            
+            nearest_target_features = np.array([
+                target_pos[0], target_pos[1],  #normalized x,y position
+                speed, distance,              #speed and normalized distance
+                0, 0, 0, 0                    #padding to maintain 20-value format
+            ])
+        
         #concatenate all components into single 1D array
         return np.concatenate(
-            [pos, rays, exit_vec, np.array(features, dtype=np.float32)]
+            [pos, rays, exit_vec, nearest_target_features]
         )
 
     def step(self, action):

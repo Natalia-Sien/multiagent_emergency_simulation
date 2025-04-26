@@ -5,6 +5,7 @@ import random
 import heapq
 import os
 import csv
+import time
 from typing import List, Tuple, Dict, Optional, Set
 
 # Initialise pygame
@@ -15,7 +16,7 @@ WIDTH, HEIGHT = 1000, 700
 CELL_SIZE = 5
 GRID_WIDTH = WIDTH // CELL_SIZE
 GRID_HEIGHT = HEIGHT // CELL_SIZE
-FIRE_SPREAD_CHANCE = 0.10
+FIRE_SPREAD_CHANCE = 0.02
 FIRE_RADIUS = 5
 FPS = 30
 MAX_GUIDANCE_DISTANCE = 120 
@@ -63,16 +64,6 @@ class PathfindingAlgorithm:
         # Smoke cost
         if self.simulation and self.simulation.smoke_grid[neighbor[1]][neighbor[0]] > 0:
             base_cost += self.simulation.smoke_grid[neighbor[1]][neighbor[0]] * 2
-        
-        # Crowding cost
-        crowd_factor = 0.0
-        for other in (self.simulation.actors if self.simulation else []):
-            if other != actor:
-                other_pos = other.to_grid_coords()
-                distance = np.linalg.norm(np.array(neighbor) - np.array(other_pos))
-                if distance < 3:  
-                    crowd_factor += (3 - distance) / 3
-        base_cost += crowd_factor
         
         # Actor type modifiers
         type_multipliers = {
@@ -147,37 +138,44 @@ class AStarAlgorithm(PathfindingAlgorithm):
         
         return []
 
+# then we start the class for the Dijkstra algorithm
 class DijkstraAlgorithm(PathfindingAlgorithm):
     def find_path(self, start: Tuple[int, int], goal: Tuple[int, int], 
                  grid: List[List[str]], actor: Optional['Actor'] = None) -> List[Tuple[int, int]]:
         search_data = self._initialize_search(start, goal)
-        
+        # while the open set is not empty, pop the node with the lowest g_score
         while search_data['open_set']:
             current_g_score, current = heapq.heappop(search_data['open_set'])
             search_data['open_set_hash'].remove(current)
             
+            # if the current node is the goal, reconstruct the path and return it
             if current == goal:
                 return self._reconstruct_path(search_data['came_from'], current, start)
             
+            # for each neighbor, check if the move is valid, if so, calculate the move cost and tentative g_score
             for dx, dy in self.DIRECTIONS:
                 neighbor = (current[0] + dx, current[1] + dy)
                 
+                # if the move is not valid, continue to the next neighbor
                 if not self.is_valid_move(neighbor, grid):
                     continue
-                    
+                # calculate the move cost and tentative g_score
                 move_cost = self.get_move_cost(current, neighbor, grid, actor)
                 tentative_g_score = search_data['g_score'][current] + move_cost
-                
+
+                # if the neighbor is not in the g_score or the tentative g_score is less 
+                # than the current g_score, update the g_score and f_score
                 if neighbor not in search_data['g_score'] or tentative_g_score < search_data['g_score'][neighbor]:
                     search_data['came_from'][neighbor] = current
                     search_data['g_score'][neighbor] = tentative_g_score
-                    
+                    # if the neighbor is not in the open set hash, add it to the open set
                     if neighbor not in search_data['open_set_hash']:
                         heapq.heappush(search_data['open_set'], (tentative_g_score, neighbor))
                         search_data['open_set_hash'].add(neighbor)
         
         return []
 
+# then we start the class for the Wall, FireExit and Actor
 class Wall:
     def __init__(self, start: Tuple[int, int], end: Tuple[int, int]):
         self.start, self.end = start, end
@@ -187,14 +185,12 @@ class FireExit:
         self.pos, self.size = pos, size
 
 class Actor:
-    def __init__(self, pos: Tuple[int, int], actor_type: str, 
-                 speed: Optional[float] = None, constraints: Optional[Dict] = None, 
-                 guided_speeds: Optional[Dict] = None):
+    def __init__(self, pos: Tuple[int, int], actor_type: str):
         self.pos = np.array(pos, dtype=float)
         self.actor_type = actor_type
         self.guiding = None
         self.guided_by = None
-        self.start_time = pygame.time.get_ticks()
+        self.start_time = time.time()
         self.end_time = None
         self.path = []
         self.goal = None
@@ -203,40 +199,15 @@ class Actor:
         self.path_update_interval = 500
         
         props = ACTOR_PROPERTIES.get(actor_type, {})
-        self.color = props.get("color", BLACK)
         self.radius = props.get("radius", 10)
-        self.speed = speed if speed is not None else props.get("speed", 1.0)
-        
-        algorithm_class = AStarAlgorithm if props.get("algorithm") == "AStar" else DijkstraAlgorithm
-        self.algorithm = algorithm_class()
-        self.algorithm.safety_weight = props.get("safety_weight", 1.0)
-        self.algorithm.simulation = None
-
-        self.constraints = constraints if constraints is not None else {}
-        self.guided_speeds = guided_speeds if guided_speeds is not None else {
-            "Patient": {"adult": 0.75, "staff": 1.0},
-            "Child": {"adult": 1.0, "staff": 1.0}
-        }.get(actor_type, {})
-
-    def draw(self, screen):
-        if self.actor_type == "Patient":
-            width = 2 * self.radius
-            height = int(2 * self.radius * 2.5)
-            rect = pygame.Rect(self.pos[0] - self.radius, self.pos[1] - height // 2, width, height)
-            pygame.draw.ellipse(screen, self.color, rect)
-        else:
-            pygame.draw.circle(screen, self.color, self.pos, self.radius)
-
-        if self.guiding:
-            distance = np.linalg.norm(self.pos - self.guiding.pos)
-            if distance <= MAX_GUIDANCE_DISTANCE:
-                # Draw a fading connection line
-                alpha = max(0, 255 - int(distance * 2))
-                color = (*BLACK, alpha)  # Fading black
-                
-                line_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-                pygame.draw.line(line_surface, color, self.pos, self.guiding.pos, 2)
-                screen.blit(line_surface, (0, 0))
+        self.speed = props.get("speed", 1.0)
+        self.algorithm = None  # Will be set later
+        self.guided_speeds = {
+            "staff": 1.0,
+            "adult": 1.0,
+            "patient": 0.5,
+            "child": 0.33
+        }
 
     def to_grid_coords(self) -> Tuple[int, int]:
         return (int(self.pos[0] // CELL_SIZE), int(self.pos[1] // CELL_SIZE))
@@ -250,27 +221,26 @@ class Actor:
             return self.guided_speeds[self.guided_by.actor_type.lower()]
         return self.speed
 
+# then we start the class for the BlueprintEnvironment
 class BlueprintEnvironment:
     def __init__(self, walls: List[Wall], exits: List[FireExit], 
-                 actors: List[Actor], fires: List[Tuple[int, int]], screen=None):
+                 actors: List[Actor], fires: List[Tuple[int, int]]):
         self.walls, self.exits, self.actors = walls, exits, actors
         self.fires = fires
         self.grid = self.compute_occupancy_grid()
         self.smoke_grid = [[0.0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-        self.render_on = True
         self.evacuation_times = {t: [] for t in ACTOR_PROPERTIES.keys()}
         self.death_times = {t: [] for t in ACTOR_PROPERTIES.keys()}
-        self.last_fire_spread = pygame.time.get_ticks()
+        self.last_fire_spread = time.time()
 
         for actor in self.actors:
             actor.algorithm.simulation = self
 
-        self.screen = screen or pygame.display.get_surface()
-        pygame.display.set_caption("Hospital Simulation")
-
+    # compute the occupancy grid
     def compute_occupancy_grid(self) -> List[List[str]]:
         grid = [["empty" for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
         
+        # for each wall, compute the occupancy grid
         for wall in self.walls:
             x0, y0 = np.array(wall.start) // CELL_SIZE
             x1, y1 = np.array(wall.end) // CELL_SIZE
@@ -278,7 +248,7 @@ class BlueprintEnvironment:
                 cx, cy = int(x0 + t * (x1 - x0)), int(y0 + t * (y1 - y0))
                 if 0 <= cx < GRID_WIDTH and 0 <= cy < GRID_HEIGHT:
                     grid[cy][cx] = "wall"
-        
+        # same for the fires
         for fx, fy in self.fires:
             grid_x, grid_y = int(fx // CELL_SIZE), int(fy // CELL_SIZE)
             if 0 <= grid_x < GRID_WIDTH and 0 <= grid_y < GRID_HEIGHT:
@@ -286,6 +256,7 @@ class BlueprintEnvironment:
         
         return grid
 
+    # update the actors
     def update_actors(self):
         self.spread_fire()
         
@@ -448,7 +419,7 @@ class BlueprintEnvironment:
         return False
 
     def spread_fire(self):
-        now = pygame.time.get_ticks()
+        now = time.time()
         if now - self.last_fire_spread < 200:
             return
         self.last_fire_spread = now
@@ -492,7 +463,7 @@ class BlueprintEnvironment:
         return False
 
     def handle_actor_death(self, actor: Actor):
-        actor.end_time = pygame.time.get_ticks()
+        actor.end_time = time.time()
         self.death_times[actor.actor_type].append((actor.end_time - actor.start_time) / 1000)
         if actor.guiding:
             actor.guiding.guided_by = None
@@ -501,7 +472,7 @@ class BlueprintEnvironment:
         self.actors.remove(actor)
 
     def handle_actor_evacuation(self, actor: Actor):
-        actor.end_time = pygame.time.get_ticks()
+        actor.end_time = time.time()
         self.evacuation_times[actor.actor_type].append((actor.end_time - actor.start_time) / 1000)
         if actor.guiding:
             actor.guiding.guided_by = None
@@ -531,93 +502,207 @@ class BlueprintEnvironment:
         pygame.display.flip()
         clock.tick(FPS)
 
-def load_blueprint(filename: str):
-    with open(filename, 'r') as f:
-        data = json.load(f)
-    return (
-        [Wall(**wall) for wall in data['walls']],
-        [FireExit(**exit) for exit in data['fire_exits']],
-        [Actor(
-            pos=actor['pos'],
-            actor_type=actor['type'],
-            speed=actor.get('speed'),
-            constraints=actor.get('constraints'),
-            guided_speeds=actor.get('guided_speeds')
-        ) for actor in data['actors']],
-        [tuple(f["pos"]) for f in data.get("fires", [])]
-    )
 
-def pygame_file_picker(folder=".") -> Optional[str]:
-    pygame.font.init()
-    picker_screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Select a Blueprint File")
-    font = pygame.font.SysFont("arial", 24)
+def run_parameterized_simulation(num_exits: int, num_actors: int, staff_percentage: float, time_steps: int, algorithm: str = "AStar"):
+    """
+    Run a simulation with specific parameters and collect statistics.
+    """
+    start_time = time.time()
+    
+    # Create walls (simple rectangular room)
+    walls = [
+        Wall((0, 0), (WIDTH, 0)),
+        Wall((0, 0), (0, HEIGHT)),
+        Wall((WIDTH, 0), (WIDTH, HEIGHT)),
+        Wall((0, HEIGHT), (WIDTH, HEIGHT))
+    ]
+    
+    # Create fire exits evenly spaced along the bottom wall
+    exits = []
+    exit_spacing = WIDTH // (num_exits + 1)
+    for i in range(num_exits):
+        exit_pos = (exit_spacing * (i + 1), HEIGHT - 20)
+        exits.append(FireExit(exit_pos))
+    
+    # Create actors with specified distribution
+    actors = []
+    num_staff = int(num_actors * staff_percentage / 100)
+    num_others = num_actors - num_staff
+    
+    # Distribute remaining actors among other types
+    num_adults = int(num_others * 0.4)
+    num_patients = int(num_others * 0.3)
+    num_children = num_others - num_adults - num_patients
+    
+    actor_specs = [
+        ("Staff", num_staff),
+        ("Adult", num_adults),
+        ("Patient", num_patients),
+        ("Child", num_children)
+    ]
 
-    files = [f for f in os.listdir(folder) if f.endswith(".json")]
-    selected_file = None
-
-    while True:
-        picker_screen.fill(WHITE)
-        
-        for i, file in enumerate(files):
-            text = font.render(file, True, BLACK)
-            rect = text.get_rect(topleft=(20, 30 + i * 40))
-            picker_screen.blit(text, rect)
-            if rect.collidepoint(pygame.mouse.get_pos()):
-                pygame.draw.rect(picker_screen, (200, 200, 255), rect, 2)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return None
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                for i, file in enumerate(files):
-                    rect = pygame.Rect(20, 30 + i * 40, 560, 30)
-                    if rect.collidepoint(event.pos):
-                        return os.path.join(folder, files[i])
-
-        pygame.display.flip()
-        clock.tick(30)
-
-def main():
-    filename = pygame_file_picker()
-    if not filename:
-        print("No file selected. Exiting...")
-        return
-    walls, exits, actors, fires = load_blueprint(filename)
+    for actor_type, count in actor_specs:
+        for _ in range(count):
+            pos = (random.randint(50, WIDTH-50), random.randint(50, HEIGHT-50))
+            actor = Actor(pos, actor_type)
+            actor.algorithm = AStarAlgorithm() if algorithm == "AStar" else DijkstraAlgorithm()
+            actors.append(actor)
+    
+    # Create initial fire
+    fires = [(WIDTH//2, HEIGHT//2)]
+    
+    # Create and run simulation
     env = BlueprintEnvironment(walls, exits, actors, fires)
+    env.render_on = False  # Disable rendering for faster execution
     
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-                elif event.key == pygame.K_SPACE:
-                    env.render_on = not env.render_on
+    # Run simulation for specified time steps
+    for _ in range(time_steps):
         env.update_actors()
-        env.render()
-    pygame.quit()
-
-    output_filename = "evacuation_statistics.csv"
-    with open(output_filename, mode='w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(["Actor Type", "Status", "Time (s)"])
-
-        for actor_type in ACTOR_PROPERTIES.keys():
-            for time in env.evacuation_times[actor_type]:
-                writer.writerow([actor_type, "Evacuated", round(time, 2)])
-            for time in env.death_times[actor_type]:
-                writer.writerow([actor_type, "Deceased", round(time, 2)])
-
-    print(f"\nSimulation complete. Statistics saved to '{output_filename}'")
+        if not env.actors:  # All actors have evacuated or died
+            break
     
-    print("\n--- Simulation Summary ---")
-    for actor_type in env.evacuation_times:
-        evacs = len(env.evacuation_times[actor_type])
-        deaths = len(env.death_times[actor_type])
-        print(f"{actor_type}: {evacs} evacuated, {deaths} burned")
+    # Calculate statistics
+    evacuated = {t: len(env.evacuation_times[t]) for t in ACTOR_PROPERTIES.keys()}
+    deceased = {t: len(env.death_times[t]) for t in ACTOR_PROPERTIES.keys()}
+    
+    # Calculate average evacuation times
+    avg_evacuated_time = {}
+    for actor_type in ACTOR_PROPERTIES.keys():
+        times = env.evacuation_times[actor_type]
+        avg_evacuated_time[actor_type] = sum(times) / len(times) if times else 0
+    
+    # Calculate evacuation rates
+    evacuation_rate = {}
+    for actor_type in ACTOR_PROPERTIES.keys():
+        total = evacuated[actor_type] + deceased[actor_type]
+        evacuation_rate[actor_type] = (evacuated[actor_type] / total * 100) if total > 0 else 0
+    
+    # Calculate simulation time
+    simulation_time = time.time() - start_time
+    
+    # Collect all statistics
+    stats = {
+        "num_exits": num_exits,
+        "num_actors": num_actors,
+        "staff_percentage": staff_percentage,
+        "time_steps": time_steps,
+        "algorithm": algorithm,
+        "evacuated": evacuated,
+        "deceased": deceased,
+        "avg_evacuated_time": avg_evacuated_time,
+        "evacuation_rate": evacuation_rate,
+        "total_evacuated": sum(evacuated.values()),
+        "total_deceased": sum(deceased.values()),
+        "simulation_time": simulation_time
+    }
+    
+    return stats
+
+def run_experiments():
+    """
+    Run multiple simulations with different parameters and save results to CSV.
+    """
+    start_time = time.time()
+    results = []
+    
+    # Define parameter ranges with fewer combinations
+    num_exits_range = [1, 3, 5] 
+    num_actors_range = [50, 150, 200] 
+    staff_percentage_range = [15, 20, 25]  
+    time_steps_range = [250, 375, 500]  
+    algorithms = ["AStar", "Dijkstra"]
+    
+    # Run experiments
+    total_experiments = len(num_exits_range) * len(num_actors_range) * len(staff_percentage_range) * len(time_steps_range) * len(algorithms)
+    current_experiment = 0
+    
+    # Create CSV file and write header
+    output_filename = "experiment_results.csv"
+    with open(output_filename, mode='w', newline='') as csvfile:
+        fieldnames = [
+            "num_exits", "num_actors", "staff_percentage", "time_steps", "algorithm",
+            "Staff_evacuated", "Staff_deceased", "Staff_avg_time", "Staff_evac_rate",
+            "Adult_evacuated", "Adult_deceased", "Adult_avg_time", "Adult_evac_rate",
+            "Patient_evacuated", "Patient_deceased", "Patient_avg_time", "Patient_evac_rate",
+            "Child_evacuated", "Child_deceased", "Child_avg_time", "Child_evac_rate",
+            "total_evacuated", "total_deceased", "simulation_time"
+        ]
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+    
+    for num_exits in num_exits_range:
+        for num_actors in num_actors_range:
+            for staff_percentage in staff_percentage_range:
+                for time_steps in time_steps_range:
+                    for algorithm in algorithms:
+                        current_experiment += 1
+                        print(f"Running experiment {current_experiment}/{total_experiments}")
+                        print(f"Parameters: exits={num_exits}, actors={num_actors}, staff={staff_percentage}%, time_steps={time_steps}, algorithm={algorithm}")
+                        
+                        stats = run_parameterized_simulation(
+                            num_exits=num_exits,
+                            num_actors=num_actors,
+                            staff_percentage=staff_percentage,
+                            time_steps=time_steps,
+                            algorithm=algorithm
+                        )
+                        results.append(stats)
+                        
+                        # Save results after each experiment
+                        with open(output_filename, mode='a', newline='') as csvfile:
+                            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                            row = {
+                                "num_exits": stats["num_exits"],
+                                "num_actors": stats["num_actors"],
+                                "staff_percentage": stats["staff_percentage"],
+                                "time_steps": stats["time_steps"],
+                                "algorithm": stats["algorithm"],
+                                "Staff_evacuated": stats["evacuated"]["Staff"],
+                                "Staff_deceased": stats["deceased"]["Staff"],
+                                "Staff_avg_time": stats["avg_evacuated_time"]["Staff"],
+                                "Staff_evac_rate": stats["evacuation_rate"]["Staff"],
+                                "Adult_evacuated": stats["evacuated"]["Adult"],
+                                "Adult_deceased": stats["deceased"]["Adult"],
+                                "Adult_avg_time": stats["avg_evacuated_time"]["Adult"],
+                                "Adult_evac_rate": stats["evacuation_rate"]["Adult"],
+                                "Patient_evacuated": stats["evacuated"]["Patient"],
+                                "Patient_deceased": stats["deceased"]["Patient"],
+                                "Patient_avg_time": stats["avg_evacuated_time"]["Patient"],
+                                "Patient_evac_rate": stats["evacuation_rate"]["Patient"],
+                                "Child_evacuated": stats["evacuated"]["Child"],
+                                "Child_deceased": stats["deceased"]["Child"],
+                                "Child_avg_time": stats["avg_evacuated_time"]["Child"],
+                                "Child_evac_rate": stats["evacuation_rate"]["Child"],
+                                "total_evacuated": stats["total_evacuated"],
+                                "total_deceased": stats["total_deceased"],
+                                "simulation_time": stats["simulation_time"]
+                            }
+                            writer.writerow(row)
+                        
+                        # Print timing information
+                        elapsed_time = time.time() - start_time
+                        avg_time_per_experiment = elapsed_time / current_experiment
+                        estimated_remaining_time = avg_time_per_experiment * (total_experiments - current_experiment)
+                        print(f"Current experiment took {stats['simulation_time']:.2f} seconds")
+                        print(f"Average time per experiment: {avg_time_per_experiment:.2f} seconds")
+                        print(f"Estimated remaining time: {estimated_remaining_time/60:.2f} minutes")
+                        print(f"Total elapsed time: {elapsed_time/60:.2f} minutes")
+                        print("-" * 50)
+                        
+                        # Print current results
+                        print("\nCurrent Results:")
+                        print(f"Staff: {stats['evacuated']['Staff']} evacuated, {stats['deceased']['Staff']} deceased")
+                        print(f"Adult: {stats['evacuated']['Adult']} evacuated, {stats['deceased']['Adult']} deceased")
+                        print(f"Patient: {stats['evacuated']['Patient']} evacuated, {stats['deceased']['Patient']} deceased")
+                        print(f"Child: {stats['evacuated']['Child']} evacuated, {stats['deceased']['Child']} deceased")
+                        print(f"Total: {stats['total_evacuated']} evacuated, {stats['total_deceased']} deceased")
+                        print("-" * 50)
+    
+    total_time = time.time() - start_time
+    print(f"\nExperiments complete. Results saved to '{output_filename}'")
+    print(f"Total execution time: {total_time/60:.2f} minutes")
+    print(f"Average time per experiment: {total_time/total_experiments:.2f} seconds")
+
 
 if __name__ == "__main__":
-    main()
+    run_experiments()

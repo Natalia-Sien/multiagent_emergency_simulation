@@ -16,8 +16,8 @@ luckily it is so well documented that it was a breeze to work with (thank you gy
 #setup and configs
 BLUEPRINT_PATH = "blueprint.json"
 # BLUEPRINT_PATH = "blueprint(stuck).json"
-MODEL_PATH_STAFF = "model_staff_0_step_4096"  #load in a pre trained, saved staff model zip
-MODEL_PATH_ADULT = "model_adult_1_step_4096"  #load in a pre trained, saved adult model zip
+MODEL_PATH_STAFF = "models/model_staff_0_step_4096"  #load in a pre trained, saved staff model zip
+MODEL_PATH_ADULT = "models/model_adult_1_step_4096"  #load in a pre trained, saved adult model zip
 
 #initialization of the screen
 pygame.init()
