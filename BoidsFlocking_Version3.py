@@ -10,7 +10,7 @@ CELL_SIZE = 5
 # the radius where each boids can influence each other
 Neighbour_Radius = 50
 # the radius that boids will repel each other
-Separation_Radius = 25
+Separation_Radius = 20
 
 # weights for sepeartion alignment and cohesion
 Separation_W = 1
@@ -22,7 +22,7 @@ Goal_Attr_W = 10
 # avoide nearby fire
 Avoid_Fire_W = 10
 # repulsion from walls
-Avoid_Walls_W = 1.1
+Avoid_Walls_W = 1
 
 # Velocity scaling
 FORCE_SCALE = 0.02
@@ -58,19 +58,17 @@ def find_exit(pos,exits):
     return best_pos
 
 # compute a vector that repels the actor away from nearby fires
-def avoid_fire(pos,fires):
-    # returns a zero vector no fire around
+def avoid_fire(pos, fires, max_radius=100):
     repel = np.zeros(2)
-    # for each fire positions
-    for fx,fy in fires:
-        fire_pos = np.array((fx,fy), dtype=float)
-        offset = pos-fire_pos
-        dist = np.linalg.norm(offset)
-        # setting a threshold distance to react to fire
-        if dist < 100:
-            # repalsion will ber stronger if fire is closer
-            factor = (100-dist)/100
-            repel += offset/(dist+1e-5)*factor
+    px, py = pos
+    max_radius_sq = max_radius * max_radius
+    for fx, fy in fires:
+        dx, dy = px-fx, py - fy
+        dist_sq = dx*dx + dy*dy
+        if dist_sq < max_radius_sq:
+            dist = math.sqrt(dist_sq) + 1e-5
+            factor = (max_radius-dist)/max_radius
+            repel += np.array([dx,dy])/dist*factor
     return repel
 
 
@@ -174,15 +172,40 @@ def update_actors_boids(actors, exits, fires, obstacle_grid):
         boids_force = (Separation_W*separation_force + Alignment_W*alignment_force +
                        Cohesion_W*cohesion_force)
 
-        # Goal Attraction
-        # get the exit position
-        exit_pos = find_exit(position_A,exits)
-        if exit_pos is not None:
-            # compute weighted vector from actor to exit 
-            to_goal = exit_pos-position_A
-            # ensure constant steering strength toward the exit
-            norm = np.linalg.norm(to_goal) + 1e-5
-            boids_force += Goal_Attr_W*(to_goal/norm)
+        # goal Attraction
+        # staff will help patients
+        if actor.actor_type == "Staff":
+            # search patients in sight
+            nearest_patient = None
+            nearest_dist = float('inf')
+            for n in neighbor_map[actor]:
+                if n.actor_type == "Patient":
+                    dist = np.linalg.norm(np.array(n.pos, float)-position_A)
+                    if dist < nearest_dist:
+                        nearest_dist = dist
+                        nearest_patient = n
+            
+            # if patient found within radius, move toward the patient
+            if nearest_patient is not None and nearest_dist < Neighbour_Radius:
+                patient_pos = np.array(nearest_patient.pos, float)
+                to_patient = patient_pos-position_A
+                norm = np.linalg.norm(to_patient)+1e-5
+                boids_force += Goal_Attr_W * (to_patient / norm)
+            else:
+                # go to the exit if no patients insight
+                exit_pos = find_exit(position_A, exits)
+                if exit_pos is not None:
+                    to_goal = exit_pos-position_A
+                    norm = np.linalg.norm(to_goal)+1e-5
+                    boids_force += Goal_Attr_W*(to_goal/norm)
+
+        else:
+            # other agents go straight to the exit
+            exit_pos = find_exit(position_A, exits)
+            if exit_pos is not None:
+                to_goal = exit_pos-position_A
+                norm = np.linalg.norm(to_goal)+1e-5
+                boids_force += Goal_Attr_W *(to_goal/norm)
 
         # avoid fire
         boids_force += Avoid_Fire_W*avoid_fire(position_A,fires)
