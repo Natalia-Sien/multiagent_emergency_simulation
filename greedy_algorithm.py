@@ -16,21 +16,21 @@ def manhattan_distance(a, b):
 
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
-def greedy_move(actor, fire_exit_pos, env):
+def greedy_move(actor, fire_exit, env):
 
     moves = [(0, -5), (0, 5), (-5, 0), (5, 0), (0, 0),
              (-5, -5), (5, -5), (-5, 5), (5, 5)]
 
     #calculate dis from current position to the fire exist
 
-    min_dis = manhattan_distance(actor.pos, fire_exit_pos)
+    min_dis = manhattan_distance(actor.pos, fire_exit)
     best_pos = actor.pos[:]
     #for each move made, calculate the new position after making a move, and calculate the distance to the
     #fire exist.
     for move in moves:
         new_pos = [actor.pos[0] + move[0], actor.pos[1] + move[1]]
         if not env.detect_collision(actor, new_pos):
-            dis = manhattan_distance(new_pos, fire_exit_pos)
+            dis = manhattan_distance(new_pos, fire_exit)
             #update move if it's closer to the fire exit
             if dis < min_dis:
                 min_dis = dis
