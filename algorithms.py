@@ -5,7 +5,9 @@ import random
 import heapq
 import os
 import csv
+import argparse
 from typing import List, Tuple, Dict, Optional, Set
+from agent_outline import BlueprintEnvironment, Wall, FireExit, Actor, load_blueprint, pygame_file_picker
 
 # Initialise pygame
 pygame.init()
@@ -43,7 +45,6 @@ clock = pygame.time.Clock()
 class PathfindingAlgorithm:
     DIRECTIONS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
     
-    
     def __init__(self, safety_weight: float = 1.0):
         self.safety_weight = safety_weight
         self.simulation = None
@@ -59,20 +60,6 @@ class PathfindingAlgorithm:
     def get_move_cost(self, current: Tuple[int, int], neighbor: Tuple[int, int], 
                      grid: List[List[str]], actor: 'Actor') -> float:
         base_cost = 1.0
-        
-        # Smoke cost
-        if self.simulation and self.simulation.smoke_grid[neighbor[1]][neighbor[0]] > 0:
-            base_cost += self.simulation.smoke_grid[neighbor[1]][neighbor[0]] * 2
-        
-        # Crowding cost
-        crowd_factor = 0.0
-        for other in (self.simulation.actors if self.simulation else []):
-            if other != actor:
-                other_pos = other.to_grid_coords()
-                distance = np.linalg.norm(np.array(neighbor) - np.array(other_pos))
-                if distance < 3:  
-                    crowd_factor += (3 - distance) / 3
-        base_cost += crowd_factor
         
         # Actor type modifiers
         type_multipliers = {
@@ -147,444 +134,102 @@ class AStarAlgorithm(PathfindingAlgorithm):
         
         return []
 
+# then we start the class for the Dijkstra algorithm
 class DijkstraAlgorithm(PathfindingAlgorithm):
     def find_path(self, start: Tuple[int, int], goal: Tuple[int, int], 
                  grid: List[List[str]], actor: Optional['Actor'] = None) -> List[Tuple[int, int]]:
         search_data = self._initialize_search(start, goal)
-        
+        # while the open set is not empty, pop the node with the lowest g_score
         while search_data['open_set']:
             current_g_score, current = heapq.heappop(search_data['open_set'])
             search_data['open_set_hash'].remove(current)
             
+            # if the current node is the goal, reconstruct the path and return it
             if current == goal:
                 return self._reconstruct_path(search_data['came_from'], current, start)
             
+            # for each neighbor, check if the move is valid, if so, calculate the move cost and tentative g_score
             for dx, dy in self.DIRECTIONS:
                 neighbor = (current[0] + dx, current[1] + dy)
                 
+                # if the move is not valid, continue to the next neighbor
                 if not self.is_valid_move(neighbor, grid):
                     continue
-                    
+                # calculate the move cost and tentative g_score
                 move_cost = self.get_move_cost(current, neighbor, grid, actor)
                 tentative_g_score = search_data['g_score'][current] + move_cost
-                
+
+                # if the neighbor is not in the g_score or the tentative g_score is less 
+                # than the current g_score, update the g_score and f_score
                 if neighbor not in search_data['g_score'] or tentative_g_score < search_data['g_score'][neighbor]:
                     search_data['came_from'][neighbor] = current
                     search_data['g_score'][neighbor] = tentative_g_score
-                    
+                    # if the neighbor is not in the open set hash, add it to the open set
                     if neighbor not in search_data['open_set_hash']:
                         heapq.heappush(search_data['open_set'], (tentative_g_score, neighbor))
                         search_data['open_set_hash'].add(neighbor)
         
         return []
 
-class Wall:
-    def __init__(self, start: Tuple[int, int], end: Tuple[int, int]):
-        self.start, self.end = start, end
 
-class FireExit:
-    def __init__(self, pos: Tuple[int, int], size: Tuple[int, int] = (40, 40)):
-        self.pos, self.size = pos, size
-
-class Actor:
-    def __init__(self, pos: Tuple[int, int], actor_type: str, 
-                 speed: Optional[float] = None, constraints: Optional[Dict] = None, 
-                 guided_speeds: Optional[Dict] = None):
-        self.pos = np.array(pos, dtype=float)
-        self.actor_type = actor_type
-        self.guiding = None
-        self.guided_by = None
-        self.start_time = pygame.time.get_ticks()
-        self.end_time = None
-        self.path = []
-        self.goal = None
-        self.last_grid_pos = self.to_grid_coords()
-        self.last_path_update = 0
-        self.path_update_interval = 500
-        
-        props = ACTOR_PROPERTIES.get(actor_type, {})
-        self.color = props.get("color", BLACK)
-        self.radius = props.get("radius", 10)
-        self.speed = speed if speed is not None else props.get("speed", 1.0)
-        
-        algorithm_class = AStarAlgorithm if props.get("algorithm") == "AStar" else DijkstraAlgorithm
-        self.algorithm = algorithm_class()
-        self.algorithm.safety_weight = props.get("safety_weight", 1.0)
-        self.algorithm.simulation = None
-
-        self.constraints = constraints if constraints is not None else {}
-        self.guided_speeds = guided_speeds if guided_speeds is not None else {
-            "Patient": {"adult": 0.75, "staff": 1.0},
-            "Child": {"adult": 1.0, "staff": 1.0}
-        }.get(actor_type, {})
-
-    def draw(self, screen):
-        if self.actor_type == "Patient":
-            width = 2 * self.radius
-            height = int(2 * self.radius * 2.5)
-            rect = pygame.Rect(self.pos[0] - self.radius, self.pos[1] - height // 2, width, height)
-            pygame.draw.ellipse(screen, self.color, rect)
-        else:
-            pygame.draw.circle(screen, self.color, self.pos, self.radius)
-
-        if self.guiding:
-            distance = np.linalg.norm(self.pos - self.guiding.pos)
-            if distance <= MAX_GUIDANCE_DISTANCE:
-                # Draw a fading connection line
-                alpha = max(0, 255 - int(distance * 2))
-                color = (*BLACK, alpha)  # Fading black
-                
-                line_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-                pygame.draw.line(line_surface, color, self.pos, self.guiding.pos, 2)
-                screen.blit(line_surface, (0, 0))
-
-    def to_grid_coords(self) -> Tuple[int, int]:
-        return (int(self.pos[0] // CELL_SIZE), int(self.pos[1] // CELL_SIZE))
-
-    def from_grid_coords(self, grid_pos: Tuple[int, int]) -> Tuple[float, float]:
-        return (grid_pos[0] * CELL_SIZE + CELL_SIZE // 2,
-                grid_pos[1] * CELL_SIZE + CELL_SIZE // 2)
-
-    def get_effective_speed(self) -> float:
-        if self.guided_by and self.guided_by.actor_type.lower() in self.guided_speeds:
-            return self.guided_speeds[self.guided_by.actor_type.lower()]
-        return self.speed
-
-class BlueprintEnvironment:
-    def __init__(self, walls: List[Wall], exits: List[FireExit], 
-                 actors: List[Actor], fires: List[Tuple[int, int]], screen=None):
-        self.walls, self.exits, self.actors = walls, exits, actors
-        self.fires = fires
-        self.grid = self.compute_occupancy_grid()
-        self.smoke_grid = [[0.0 for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-        self.render_on = True
-        self.evacuation_times = {t: [] for t in ACTOR_PROPERTIES.keys()}
-        self.death_times = {t: [] for t in ACTOR_PROPERTIES.keys()}
-        self.last_fire_spread = pygame.time.get_ticks()
-
-        for actor in self.actors:
-            actor.algorithm.simulation = self
-
-        self.screen = screen or pygame.display.get_surface()
-        pygame.display.set_caption("Hospital Simulation")
-
-    def compute_occupancy_grid(self) -> List[List[str]]:
-        grid = [["empty" for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-        
-        for wall in self.walls:
-            x0, y0 = np.array(wall.start) // CELL_SIZE
-            x1, y1 = np.array(wall.end) // CELL_SIZE
-            for t in np.linspace(0, 1, int(np.hypot(x1 - x0, y1 - y0))):
-                cx, cy = int(x0 + t * (x1 - x0)), int(y0 + t * (y1 - y0))
-                if 0 <= cx < GRID_WIDTH and 0 <= cy < GRID_HEIGHT:
-                    grid[cy][cx] = "wall"
-        
-        for fx, fy in self.fires:
-            grid_x, grid_y = int(fx // CELL_SIZE), int(fy // CELL_SIZE)
-            if 0 <= grid_x < GRID_WIDTH and 0 <= grid_y < GRID_HEIGHT:
-                grid[grid_y][grid_x] = "fire"
-        
-        return grid
-
-    def update_actors(self):
-        self.spread_fire()
-        
-        for actor in self.actors[:]:
-            if self.actor_in_fire(actor):
-                self.handle_actor_death(actor)
-                continue
-
-            if actor.actor_type == "Child":
-                self.move_child(actor)
-            elif actor.actor_type == "Patient":
-                self.move_patient(actor)
-            elif actor.actor_type == "Staff":
-                self.update_staff(actor)
-            elif actor.actor_type == "Adult":
-                self.update_adult(actor)
-
-        for actor in self.actors[:]:
-            if self.actor_reached_exit(actor) and (actor.actor_type != "Patient" or actor.guiding is None):
-                self.handle_actor_evacuation(actor)
-
-    def move_actor_along_path(self, actor: Actor, target_pos: Tuple[int, int]):
-        start = actor.to_grid_coords()
-        goal = (int(target_pos[0] // CELL_SIZE), int(target_pos[1] // CELL_SIZE))
-
-        if not actor.path or actor.goal != goal:
-            actor.path = actor.algorithm.find_path(start, goal, self.grid, actor)
-            actor.goal = goal
-
-        if actor.path and len(actor.path) > 1:
-            next_grid = actor.path[1]
-            next_pos = actor.from_grid_coords(next_grid)
-
-            direction = np.array(next_pos) - np.array(actor.pos, dtype=float)
-            distance = np.linalg.norm(direction)
-
-            if distance > 0:
-                direction /= distance
-                move_distance = actor.get_effective_speed() * CELL_SIZE
-                actor.pos = np.array(actor.pos, dtype=float) + direction * move_distance
-
-                if np.linalg.norm(np.array(actor.to_grid_coords()) - np.array(next_grid)) < 1:
-                    actor.path.pop(0)
-
-    def move_child(self, child: Actor):
-        nearest_adult = self.find_nearest_actor(child, ["Adult", "Staff"], max_distance=100)
-        if nearest_adult:
-            self.move_actor_along_path(child, nearest_adult.pos)
-        else:
-            nearest_exit = self.find_nearest_exit(child)
-            if nearest_exit:
-                self.move_actor_along_path(child, nearest_exit.pos)
-
-    def move_patient(self, patient: Actor):
-        guide = self.find_nearest_actor(patient, ["Staff", "Adult"], max_distance=100)
-        if guide and guide.guiding is None:
-            self.move_actor_along_path(patient, guide.pos)
-        else:
-            nearest_exit = self.find_nearest_exit(patient)
-            if nearest_exit:
-                self.move_actor_along_path(patient, nearest_exit.pos)
-
-    def update_staff(self, staff: Actor):
-        MAX_GUIDANCE_DISTANCE = 120  
-        CONNECTION_DISTANCE = 10    
-        
-        if staff.guiding:
-            if staff.guiding not in self.actors:
-                staff.guiding.guided_by = None
-                staff.guiding = None
-            elif np.linalg.norm(staff.pos - staff.guiding.pos) > MAX_GUIDANCE_DISTANCE:
-                staff.guiding.guided_by = None
-                staff.guiding = None
-        
-        if staff.guiding:
-            exit_pos = self.find_nearest_exit(staff).pos
-            self.move_actor_along_path(staff, exit_pos)
-            
-            if np.linalg.norm(staff.pos - staff.guiding.pos) <= MAX_GUIDANCE_DISTANCE:
-                self.move_actor_along_path(staff.guiding, staff.pos)
-            else:
-                staff.guiding.guided_by = None
-                staff.guiding = None
-        
-        else:
-            patients = [
-                p for p in self.get_unescorted_actors_in_range(staff, "Patient")
-                if np.linalg.norm(staff.pos - p.pos) <= MAX_GUIDANCE_DISTANCE
-            ]
-            
-            if patients:
-                self.move_actor_along_path(staff, patients[0].pos)
-                if np.linalg.norm(staff.pos - patients[0].pos) < CONNECTION_DISTANCE:
-                    staff.guiding = patients[0]
-                    patients[0].guided_by = staff
-            
-            else:
-                children = [
-                    c for c in self.get_unescorted_actors_in_range(staff, "Child")
-                    if np.linalg.norm(staff.pos - c.pos) <= MAX_GUIDANCE_DISTANCE
-                ]
-                
-                if children:
-                    self.move_actor_along_path(staff, children[0].pos)
-                    if np.linalg.norm(staff.pos - children[0].pos) < CONNECTION_DISTANCE:
-                        staff.guiding = children[0]
-                        children[0].guided_by = staff
-                
-                elif self.should_leave(staff):
-                    exit_pos = self.find_nearest_exit(staff).pos
-                    self.move_actor_along_path(staff, exit_pos)
-
-    def update_adult(self, adult: Actor):
-        if adult.guiding and adult.guiding not in self.actors:
-            adult.guiding = None
-            
-        if adult.guiding:
-            exit_pos = self.find_nearest_exit(adult).pos
-            self.move_actor_along_path(adult, exit_pos)
-            self.move_actor_along_path(adult.guiding, adult.pos)
-        else:
-            children = self.get_unescorted_actors_in_range(adult, "Child")
-            if children:
-                self.move_actor_along_path(adult, children[0].pos)
-                if np.linalg.norm(np.array(adult.pos) - np.array(children[0].pos)) < 10:
-                    adult.guiding = children[0]
-            elif self.should_leave(adult):
-                exit_pos = self.find_nearest_exit(adult).pos
-                self.move_actor_along_path(adult, exit_pos)
-
-    def get_unescorted_actors_in_range(self, guide_actor: Actor, target_type: str) -> List[Actor]:
-        return [
-            actor for actor in self.actors
-            if (actor.actor_type == target_type and 
-                actor.guiding is None and 
-                np.linalg.norm(np.array(actor.pos) - np.array(guide_actor.pos)) < 100)
-        ]
-
-    def should_leave(self, actor: Actor) -> bool:
-        return (len(self.get_unescorted_actors_in_range(actor, "Patient")) == 0 and 
-               len(self.get_unescorted_actors_in_range(actor, "Child")) == 0)
-
-    def find_nearest_actor(self, actor: Actor, types: List[str], max_distance: float) -> Optional[Actor]:
-        nearest = None
-        min_dist = float('inf')
-        
-        for other in self.actors:
-            if other.actor_type in types and other != actor:
-                dist = np.linalg.norm(np.array(actor.pos) - np.array(other.pos))
-                if dist < min_dist and dist < max_distance:
-                    min_dist = dist
-                    nearest = other
-                    
-        return nearest
-
-    def actor_in_fire(self, actor: Actor) -> bool:
-        for fire in self.fires:
-            if np.linalg.norm(np.array(actor.pos) - np.array(fire)) < FIRE_RADIUS:
-                return True
-        return False
-
-    def spread_fire(self):
-        now = pygame.time.get_ticks()
-        if now - self.last_fire_spread < 200:
-            return
-        self.last_fire_spread = now
-
-        new_fires = set()
-        existing_fire_cells = set((fx // CELL_SIZE, fy // CELL_SIZE) for fx, fy in self.fires)
-
-        for fx, fy in self.fires:
-            grid_x, grid_y = fx // CELL_SIZE, fy // CELL_SIZE
-            neighbors = [
-                (grid_x + 1, grid_y), (grid_x - 1, grid_y),
-                (grid_x, grid_y + 1), (grid_x, grid_y - 1)
-            ]
-            for nx, ny in neighbors:
-                if (0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT and
-                    (nx, ny) not in existing_fire_cells and 
-                    random.random() < FIRE_SPREAD_CHANCE):
-                    new_fires.add((nx, ny))
-
-        for nx, ny in new_fires:
-            px, py = nx * CELL_SIZE + CELL_SIZE // 2, ny * CELL_SIZE + CELL_SIZE // 2
-            self.fires.append((px, py))
-            self.grid[ny][nx] = "fire"
-
-    def find_nearest_exit(self, actor: Actor) -> Optional[FireExit]:
-        nearest = None
-        min_dist = float('inf')
-        
-        for exit in self.exits:
-            dist = np.linalg.norm(np.array(actor.pos) - np.array(exit.pos))
-            if dist < min_dist:
-                min_dist = dist
-                nearest = exit
-                
-        return nearest
-
-    def actor_reached_exit(self, actor: Actor) -> bool:
-        for exit in self.exits:
-            if np.linalg.norm(np.array(actor.pos) - np.array(exit.pos)) < exit.size[0] // 2:
-                return True
-        return False
-
-    def handle_actor_death(self, actor: Actor):
-        actor.end_time = pygame.time.get_ticks()
-        self.death_times[actor.actor_type].append((actor.end_time - actor.start_time) / 1000)
-        if actor.guiding:
-            actor.guiding.guided_by = None
-        if actor.guided_by:
-            actor.guided_by.guiding = None
-        self.actors.remove(actor)
-
-    def handle_actor_evacuation(self, actor: Actor):
-        actor.end_time = pygame.time.get_ticks()
-        self.evacuation_times[actor.actor_type].append((actor.end_time - actor.start_time) / 1000)
-        if actor.guiding:
-            actor.guiding.guided_by = None
-        self.actors.remove(actor)
-
-    def render(self):
-        if not self.render_on:
-            return
-            
-        self.screen.fill(WHITE)
-        
-        for wall in self.walls:
-            pygame.draw.line(self.screen, BLACK, wall.start, wall.end, 2)
-            
-        for exit in self.exits:
-            pygame.draw.rect(self.screen, RED, 
-                           (exit.pos[0] - exit.size[0]//2, 
-                            exit.pos[1] - exit.size[1]//2, 
-                            exit.size[0], exit.size[1]))
-            
-        for fire in self.fires:
-            pygame.draw.circle(self.screen, ORANGE, fire, FIRE_RADIUS)
-            
-        for actor in self.actors:
-            actor.draw(self.screen)
-            
-        pygame.display.flip()
-        clock.tick(FPS)
-
-def load_blueprint(filename: str):
-    with open(filename, 'r') as f:
-        data = json.load(f)
-    return (
-        [Wall(**wall) for wall in data['walls']],
-        [FireExit(**exit) for exit in data['fire_exits']],
-        [Actor(
-            pos=actor['pos'],
-            actor_type=actor['type'],
-            speed=actor.get('speed'),
-            constraints=actor.get('constraints'),
-            guided_speeds=actor.get('guided_speeds')
-        ) for actor in data['actors']],
-        [tuple(f["pos"]) for f in data.get("fires", [])]
-    )
-
-def pygame_file_picker(folder=".") -> Optional[str]:
+def algorithm_picker():
     pygame.font.init()
     picker_screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Select a Blueprint File")
+    pygame.display.set_caption("Select Algorithm")
     font = pygame.font.SysFont("arial", 24)
-
-    files = [f for f in os.listdir(folder) if f.endswith(".json")]
-    selected_file = None
-
+    
+    algorithms = ["A* Algorithm", "Dijkstra's Algorithm"]
+    selected_algorithm = None
+    
     while True:
         picker_screen.fill(WHITE)
         
-        for i, file in enumerate(files):
-            text = font.render(file, True, BLACK)
+        for i, algo in enumerate(algorithms):
+            text = font.render(algo, True, BLACK)
             rect = text.get_rect(topleft=(20, 30 + i * 40))
             picker_screen.blit(text, rect)
             if rect.collidepoint(pygame.mouse.get_pos()):
                 pygame.draw.rect(picker_screen, (200, 200, 255), rect, 2)
-
+        
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 return None
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                for i, file in enumerate(files):
+                for i, algo in enumerate(algorithms):
                     rect = pygame.Rect(20, 30 + i * 40, 560, 30)
                     if rect.collidepoint(event.pos):
-                        return os.path.join(folder, files[i])
-
+                        return "astar" if i == 0 else "dijkstra"
+        
         pygame.display.flip()
         clock.tick(30)
 
 def main():
+    # Select algorithm using pygame menu
+    selected_algorithm = algorithm_picker()
+    if not selected_algorithm:
+        print("No algorithm selected. Exiting...")
+        return
+    
+    # Map algorithm choice to class
+    algorithm_map = {
+        'astar': AStarAlgorithm,
+        'dijkstra': DijkstraAlgorithm
+    }
+    algorithm_class = algorithm_map[selected_algorithm]
+    
     filename = pygame_file_picker()
     if not filename:
         print("No file selected. Exiting...")
         return
     walls, exits, actors, fires = load_blueprint(filename)
+    
+    # Create environment
     env = BlueprintEnvironment(walls, exits, actors, fires)
+    
+    # Assign selected algorithm to all actors
+    for actor in env.actors:
+        actor.algorithm = algorithm_class(safety_weight=ACTOR_PROPERTIES.get(actor.actor_type, {}).get("safety_weight", 1.0))
+        actor.algorithm.simulation = env
     
     running = True
     while running:
@@ -596,11 +241,54 @@ def main():
                     running = False
                 elif event.key == pygame.K_SPACE:
                     env.render_on = not env.render_on
+        
+        # Update actors using selected algorithm
+        for actor in env.actors:
+            if actor.actor_type == "Patient" and actor.guiding is None:
+                guide = env.find_nearest_actor(actor, ["Staff", "Adult"], max_distance=100)
+                if guide and guide.guiding is None:
+                    target_pos = guide.pos
+                else:
+                    target_pos = env.find_nearest_exit(actor).pos
+            elif actor.actor_type == "Child" and actor.guiding is None:
+                guide = env.find_nearest_actor(actor, ["Adult", "Staff"], max_distance=100)
+                if guide:
+                    target_pos = guide.pos
+                else:
+                    target_pos = env.find_nearest_exit(actor).pos
+            else:
+                target_pos = env.find_nearest_exit(actor).pos
+            
+            current_grid = (int(actor.pos[0] // CELL_SIZE), int(actor.pos[1] // CELL_SIZE))
+            target_grid = (int(target_pos[0] // CELL_SIZE), int(target_pos[1] // CELL_SIZE))
+            
+            # Find path using the actor's algorithm
+            path = actor.algorithm.find_path(current_grid, target_grid, env.grid, actor)
+            
+            # Move along the path if one exists
+            if path and len(path) > 1:
+                next_grid = path[1]
+                next_pos = (next_grid[0] * CELL_SIZE + CELL_SIZE // 2,
+                          next_grid[1] * CELL_SIZE + CELL_SIZE // 2)
+                
+                # Calculate movement
+                direction = np.array(next_pos, dtype=float) - np.array(actor.pos, dtype=float)
+                norm = np.linalg.norm(direction)
+                if norm > 0:
+                    direction = direction / norm
+                    move_distance = actor.speed * CELL_SIZE
+                    new_pos = np.array(actor.pos, dtype=float) + direction * move_distance
+                    
+                    # Check for collisions before moving
+                    if not env.detect_collision(actor, new_pos):
+                        actor.pos = new_pos.tolist()
+        
         env.update_actors()
         env.render()
+    
     pygame.quit()
 
-    output_filename = "evacuation_statistics.csv"
+    output_filename = f"evacuation_statistics_{selected_algorithm}.csv"
     with open(output_filename, mode='w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["Actor Type", "Status", "Time (s)"])
