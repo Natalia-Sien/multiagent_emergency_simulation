@@ -133,6 +133,15 @@ class BlueprintEnvironment:
         self.render_on = True  #enable rendering
         self.evacuation_times = {"Staff": [], "Adult": [], "Patient": [], "Child": []}  #evacuation metrics
         self.death_times = {"Staff": [], "Adult": [], "Patient": [], "Child": []}  #death metrics
+        self.initial_population = len(actors) #initial population is the number of total actors
+        self.initial_counts = {
+            "Staff": sum(1 for a in actors if a.actor_type == "Staff"), #dict entry for staff
+            "Adult": sum(1 for a in actors if a.actor_type == "Adult"), #dict entry for adults
+            "Patient": sum(1 for a in actors if a.actor_type == "Patient"), #dict entry for patients
+            "Child": sum(1 for a in actors if a.actor_type == "Child"), #dict entry for children
+        }
+
+        self.time_steps = 0
 
         #init timing for actors
         start_ticks = pygame.time.get_ticks()
@@ -217,6 +226,8 @@ class BlueprintEnvironment:
                 self.move_patient(actor)
             elif actor.actor_type == "Staff":
                 self.update_staff(actor)
+            elif actor.actor_type == "Adult":
+                self.update_adult
         #handle exiting agents
         for actor in self.actors[:]:
             if self.actor_reached_exit(actor) and (
@@ -227,6 +238,7 @@ class BlueprintEnvironment:
                     (actor.end_time - actor.start_time) / 1000
                 )  #record evacuation time
                 self.actors.remove(actor)  #remove evacuated
+        self.time_steps += 1
 
     def actor_in_fire(self, actor):
         #check if within fire radius of any fire
@@ -265,6 +277,60 @@ class BlueprintEnvironment:
             speed = patient.guided_speeds.get(guide_type, 1.0)
             #move patient toward guide
             self.move_towards(patient, guide.pos, speed)
+    def update_adult(self, adult):
+        #if adult was guiding someone who no longer exists, clear both links
+        if adult.guiding and adult.guiding not in self.actors:
+            adult.guiding.guiding = None
+            adult.guiding = None
+
+        #if currently guiding someone, escort them both toward the exit
+        if adult.guiding:
+            # find nearest exit
+            exit_pos = self.find_nearest_exit(adult).pos
+            #move the adult toward exit
+            self.move_towards(adult, exit_pos, adult.speed)
+            #then move the guided actor toward the adult
+            guidee = adult.guiding
+            #use guided speed if defined, else default
+            speed = guidee.guided_speeds.get(adult.actor_type.lower(), guidee.speed)
+            self.move_towards(guidee, adult.pos, speed)
+
+            #once the guidee reaches exit, remove and clear links
+            if self.actor_reached_exit(guidee):
+                if guidee in self.actors:
+                    self.actors.remove(guidee)
+                guidee.guiding = None
+                adult.guiding = None
+
+        else:
+            #try to find unescorted patients in vision
+            patients = self.get_unescorted_actors_in_range(adult, "Patient")
+            if patients:
+                target = patients[0]
+                #move toward that patient
+                self.move_towards(adult, target.pos, adult.speed)
+                #establish guidance link
+                if np.linalg.norm(np.array(adult.pos) - np.array(target.pos)) < 10:
+                    adult.guiding = target
+                    target.guiding = adult
+
+            else:
+                #try to find unescorted Children
+                children = self.get_unescorted_actors_in_range(adult, "Child")
+                if children:
+                    target = children[0]
+                    # move toward that child
+                    self.move_towards(adult, target.pos, adult.speed)
+                    #if close establish guidance link
+                    if np.linalg.norm(np.array(adult.pos) - np.array(target.pos)) < 10:
+                        adult.guiding = target
+                        target.guiding = adult
+
+                else:
+                    #nobody to guide, head for exit yourself
+                    if self.should_leave(adult):
+                        exit_pos = self.find_nearest_exit(adult).pos
+                        self.move_towards(adult, exit_pos, adult.speed)
 
     def update_staff(self, staff):
         #if staff was guiding someone who no longer exists, clear both links
@@ -451,6 +517,80 @@ class BlueprintEnvironment:
             deaths = len(self.death_times[actor_type])
             print(f"{actor_type}: {evacs} evacuated, {deaths} burned")
 
+    def export_advanced_metrics(self, csv_path="advanced_evacuation_results.csv"):
+        """
+        writes one row of high‐level summary metrics to CSV:
+        exits, population, type percentages, time steps,
+        overall avg evac/death times, per‐type avg escape times,
+        total evac/burned, and per‐type evac counts.
+        """
+
+        #basics
+        n_exits = len(self.exits)
+        pop = self.initial_population
+        counts = self.initial_counts
+
+        #percentages by type
+        pct = {
+            t: (counts[t] / pop if pop > 0 else 0.0)
+            for t in counts
+        }
+
+        #flatten evacuation & death times
+        all_evacs = [t for times in self.evacuation_times.values() for t in times]
+        all_deaths = [t for times in self.death_times.values() for t in times]
+
+        #averages
+        avg_evac = sum(all_evacs) / len(all_evacs) if all_evacs else 0.0
+        avg_death = sum(all_deaths) / len(all_deaths) if all_deaths else 0.0
+
+        #per type average escape times
+        avg_escape = {}
+        for t in counts:
+            times = self.evacuation_times.get(t, [])
+            avg_escape[t] = sum(times) / len(times) if times else 0.0
+
+        #totals
+        num_evacuated = sum(len(v) for v in self.evacuation_times.values())
+        num_burned = sum(len(v) for v in self.death_times.values())
+
+        #per type evac counts
+        evac_counts = {
+            t: len(self.evacuation_times.get(t, []))
+            for t in counts
+        }
+
+        #write new csv
+        with open(csv_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            #header
+            writer.writerow([
+                "n_exits", "population",
+                "pct_staff", "pct_adult", "pct_patient", "pct_child",
+                "time_steps",
+                "avg_evac_time", "avg_death_time",
+                "staff_avg_escape_time", "adult_avg_escape_time",
+                "patient_avg_escape_time", "child_avg_escape_time",
+                "num_evacuated", "num_burned",
+                "staff_evacuated", "adult_evacuated",
+                "patient_evacuated", "child_evacuated"
+            ])
+            #data row entry
+            writer.writerow([
+                n_exits, pop,
+                f"{pct['Staff']:.3f}", f"{pct['Adult']:.3f}",
+                f"{pct['Patient']:.3f}", f"{pct['Child']:.3f}",
+                self.time_steps,
+                f"{avg_evac:.2f}", f"{avg_death:.2f}",
+                f"{avg_escape['Staff']:.2f}", f"{avg_escape['Adult']:.2f}",
+                f"{avg_escape['Patient']:.2f}", f"{avg_escape['Child']:.2f}",
+                num_evacuated, num_burned,
+                evac_counts['Staff'], evac_counts['Adult'],
+                evac_counts['Patient'], evac_counts['Child']
+            ])
+        print(f"Advanced metrics exported to {csv_path}")
+
+
 def pygame_file_picker(folder="."):
     import os
     import pygame
@@ -493,7 +633,8 @@ def pygame_file_picker(folder="."):
 if __name__ == '__main__':
     #set to true to export metrics at end
     metrics = False
-
+    #set true to export advanced_metrics at the end
+    advanced_metrics = True
     #prompt for blueprint file
     filename = pygame_file_picker()
 
@@ -523,3 +664,6 @@ if __name__ == '__main__':
     #export metrics if enabled
     if metrics:
         env.export_metrics("evacuation_results.csv")
+    if advanced_metrics:
+        env.export_advanced_metrics("advanced_evacuation_results.csv")
+
