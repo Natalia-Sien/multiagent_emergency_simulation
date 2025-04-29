@@ -230,9 +230,7 @@ class BlueprintEnvironment:
                 self.update_adult(actor)
         #handle exiting agents
         for actor in self.actors[:]:
-            if self.actor_reached_exit(actor) and (
-                actor.actor_type != "Patient" or actor.guiding is None
-            ):
+            if self.actor_reached_exit(actor):
                 actor.end_time = pygame.time.get_ticks()
                 self.evacuation_times[actor.actor_type].append(
                     (actor.end_time - actor.start_time) / 1000

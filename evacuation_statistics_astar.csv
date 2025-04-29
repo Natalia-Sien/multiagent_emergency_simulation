@@ -1,0 +1,12 @@
+Actor Type,Status,Time (s)
+Staff,Evacuated,0.32
+Staff,Evacuated,0.67
+Staff,Evacuated,1.40
+Adult,Evacuated,1.34
+Adult,Evacuated,1.64
+Patient,Evacuated,1.34
+Child,Evacuated,1.38
+Child,Evacuated,1.64
+Child,Evacuated,1.66
+Child,Evacuated,1.85
+Child,Evacuated,2.09

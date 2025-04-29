@@ -1,0 +1,20 @@
+Actor Type,Status,Time (s)
+Staff,Evacuated,5.04
+Staff,Evacuated,8.92
+Staff,Evacuated,17.76
+Staff,Evacuated,17.76
+Staff,Evacuated,18.50
+Staff,Evacuated,18.95
+Staff,Evacuated,19.11
+Adult,Evacuated,17.53
+Adult,Evacuated,17.76
+Adult,Evacuated,18.34
+Adult,Evacuated,19.39
+Patient,Evacuated,18.95
+Patient,Evacuated,19.11
+Patient,Evacuated,19.39
+Child,Evacuated,17.76
+Child,Evacuated,19.39
+Child,Evacuated,20.38
+Child,Evacuated,20.76
+Child,Evacuated,22.31
