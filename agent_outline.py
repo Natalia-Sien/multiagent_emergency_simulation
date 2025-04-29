@@ -227,7 +227,7 @@ class BlueprintEnvironment:
             elif actor.actor_type == "Staff":
                 self.update_staff(actor)
             elif actor.actor_type == "Adult":
-                self.update_adult
+                self.update_adult(actor)
         #handle exiting agents
         for actor in self.actors[:]:
             if self.actor_reached_exit(actor) and (
