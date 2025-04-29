@@ -1,2 +1,0 @@
-n_exits,population,pct_staff,pct_adult,pct_patient,pct_child,time_steps,avg_evac_time,avg_death_time,staff_avg_escape_time,adult_avg_escape_time,patient_avg_escape_time,child_avg_escape_time,num_evacuated,num_burned,staff_evacuated,adult_evacuated,patient_evacuated,child_evacuated
-4,27,0.296,0.222,0.185,0.296,170,0.56,2.16,0.59,0.00,0.00,0.33,9,2,8,0,0,1
