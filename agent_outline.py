@@ -305,8 +305,15 @@ class BlueprintEnvironment:
 
             #once the guidee reaches exit, remove and clear links
             if self.actor_reached_exit(guidee):
+                #record evacuation time
+                guidee.end_time = pygame.time.get_ticks()
+                self.evacuation_times[guidee.actor_type].append(
+                    (guidee.end_time - guidee.start_time) / 1000
+                )
+                #remove them from the simulation
                 if guidee in self.actors:
                     self.actors.remove(guidee)
+                #clear guidance links
                 guidee.guiding = None
                 adult.guiding = None
 
@@ -358,8 +365,15 @@ class BlueprintEnvironment:
 
             #once guidee reaches exit, remove and clear links
             if self.actor_reached_exit(guidee):
+                #record evacuation time
+                guidee.end_time = pygame.time.get_ticks()
+                self.evacuation_times[guidee.actor_type].append(
+                    (guidee.end_time - guidee.start_time) / 1000
+                )
+                #remove them from the simulation
                 if guidee in self.actors:
                     self.actors.remove(guidee)
+                #clear guidance links
                 guidee.guiding = None
                 staff.guiding = None
 
