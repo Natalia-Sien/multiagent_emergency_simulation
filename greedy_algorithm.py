@@ -68,6 +68,8 @@ def run_simulation(blueprint_path):
 
         env.update_actors()
         env.render()
+        env.export_advanced_metrics()
+        env.export_metrics()
 
     pygame.quit()
     
