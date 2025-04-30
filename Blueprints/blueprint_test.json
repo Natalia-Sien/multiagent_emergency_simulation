@@ -1,0 +1,616 @@
+{
+    "walls": [
+        {
+            "start": [
+                88,
+                150
+            ],
+            "end": [
+                917,
+                150
+            ]
+        },
+        {
+            "start": [
+                90,
+                147
+            ],
+            "end": [
+                90,
+                562
+            ]
+        },
+        {
+            "start": [
+                88,
+                558
+            ],
+            "end": [
+                921,
+                558
+            ]
+        },
+        {
+            "start": [
+                914,
+                148
+            ],
+            "end": [
+                914,
+                558
+            ]
+        },
+        {
+            "start": [
+                90,
+                274
+            ],
+            "end": [
+                214,
+                274
+            ]
+        },
+        {
+            "start": [
+                295,
+                151
+            ],
+            "end": [
+                295,
+                276
+            ]
+        },
+        {
+            "start": [
+                295,
+                274
+            ],
+            "end": [
+                442,
+                274
+            ]
+        },
+        {
+            "start": [
+                522,
+                151
+            ],
+            "end": [
+                522,
+                276
+            ]
+        },
+        {
+            "start": [
+                521,
+                273
+            ],
+            "end": [
+                669,
+                273
+            ]
+        },
+        {
+            "start": [
+                735,
+                151
+            ],
+            "end": [
+                735,
+                276
+            ]
+        },
+        {
+            "start": [
+                813,
+                275
+            ],
+            "end": [
+                916,
+                275
+            ]
+        },
+        {
+            "start": [
+                90,
+                412
+            ],
+            "end": [
+                218,
+                412
+            ]
+        },
+        {
+            "start": [
+                304,
+                410
+            ],
+            "end": [
+                304,
+                560
+            ]
+        },
+        {
+            "start": [
+                303,
+                413
+            ],
+            "end": [
+                668,
+                413
+            ]
+        },
+        {
+            "start": [
+                667,
+                480
+            ],
+            "end": [
+                667,
+                556
+            ]
+        },
+        {
+            "start": [
+                485,
+                474
+            ],
+            "end": [
+                485,
+                557
+            ]
+        },
+        {
+            "start": [
+                270,
+                274
+            ],
+            "end": [
+                443,
+                274
+            ]
+        },
+        {
+            "start": [
+                275,
+                413
+            ],
+            "end": [
+                435,
+                413
+            ]
+        },
+        {
+            "start": [
+                665,
+                413
+            ],
+            "end": [
+                665,
+                430
+            ]
+        },
+        {
+            "start": [
+                814,
+                416
+            ],
+            "end": [
+                915,
+                416
+            ]
+        }
+    ],
+    "fire_exits": [
+        {
+            "pos": [
+                900,
+                353
+            ],
+            "size": [
+                40,
+                40
+            ]
+        }
+    ],
+    "actors": [
+        {
+            "pos": [
+                128,
+                188
+            ],
+            "type": "Patient",
+            "speed": 0.0,
+            "constraints": {
+                "needs_guidance": true
+            },
+            "guided_speeds": {
+                "adult": 0.75,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                194,
+                193
+            ],
+            "type": "Patient",
+            "speed": 0.0,
+            "constraints": {
+                "needs_guidance": true
+            },
+            "guided_speeds": {
+                "adult": 0.75,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                121,
+                252
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                278,
+                170
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                131,
+                508
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                366,
+                254
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                702,
+                170
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                327,
+                436
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                692,
+                533
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                501,
+                539
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                118,
+                433
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                149,
+                433
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                292,
+                391
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                485,
+                167
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                898,
+                530
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                819,
+                528
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                659,
+                186
+            ],
+            "type": "Patient",
+            "speed": 0.0,
+            "constraints": {
+                "needs_guidance": true
+            },
+            "guided_speeds": {
+                "adult": 0.75,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                628,
+                183
+            ],
+            "type": "Patient",
+            "speed": 0.0,
+            "constraints": {
+                "needs_guidance": true
+            },
+            "guided_speeds": {
+                "adult": 0.75,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                321,
+                388
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                268,
+                523
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                340,
+                529
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                440,
+                502
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                869,
+                493
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                856,
+                535
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                893,
+                165
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                344,
+                178
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                418,
+                175
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                273,
+                233
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                640,
+                523
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                593,
+                292
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        }
+    ],
+    "fires": [
+        {
+            "pos": [
+                100,
+                345
+            ]
+        }
+    ]
+}
