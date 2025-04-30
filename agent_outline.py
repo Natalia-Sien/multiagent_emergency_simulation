@@ -230,7 +230,9 @@ class BlueprintEnvironment:
                 self.update_adult(actor)
         #handle exiting agents
         for actor in self.actors[:]:
-            if self.actor_reached_exit(actor):
+            if self.actor_reached_exit(actor) and (
+                actor.actor_type != "Patient" or actor.guiding is None
+            ):
                 actor.end_time = pygame.time.get_ticks()
                 self.evacuation_times[actor.actor_type].append(
                     (actor.end_time - actor.start_time) / 1000
@@ -266,6 +268,13 @@ class BlueprintEnvironment:
             self.random_move(child)  #move randomly if no guide
 
     def move_patient(self, patient):
+        if self.actor_reached_exit(patient) and patient in self.actors:
+            patient.end_time = pygame.time.get_ticks()
+            self.evacuation_times["Patient"].append(
+                (patient.end_time - patient.start_time) / 1000
+            )
+            self.actors.remove(patient)
+            return
         #find nearest staff or adult within 100 units
         guide = self.find_nearest_actor(patient, ["Staff", "Adult"], max_distance=100)
         #if found and not already guiding someone
@@ -275,6 +284,7 @@ class BlueprintEnvironment:
             speed = patient.guided_speeds.get(guide_type, 1.0)
             #move patient toward guide
             self.move_towards(patient, guide.pos, speed)
+
     def update_adult(self, adult):
         #if adult was guiding someone who no longer exists, clear both links
         if adult.guiding and adult.guiding not in self.actors:
@@ -488,7 +498,7 @@ class BlueprintEnvironment:
     def actor_reached_exit(self, actor):
         #check if actor is within 20px of any exit
         return any(
-            np.linalg.norm(np.array(actor.pos) - np.array(exit.pos)) < 20
+            np.linalg.norm(np.array(actor.pos) - np.array(exit.pos)) <= 20
             for exit in self.exits
         )
 
