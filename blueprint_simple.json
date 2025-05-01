@@ -1,0 +1,498 @@
+{
+    "walls": [
+        {
+            "start": [
+                79,
+                213
+            ],
+            "end": [
+                79,
+                647
+            ]
+        },
+        {
+            "start": [
+                79,
+                216
+            ],
+            "end": [
+                946,
+                216
+            ]
+        },
+        {
+            "start": [
+                80,
+                649
+            ],
+            "end": [
+                945,
+                649
+            ]
+        },
+        {
+            "start": [
+                945,
+                217
+            ],
+            "end": [
+                945,
+                650
+            ]
+        }
+    ],
+    "fire_exits": [
+        {
+            "pos": [
+                125,
+                223
+            ],
+            "size": [
+                40,
+                40
+            ]
+        },
+        {
+            "pos": [
+                892,
+                227
+            ],
+            "size": [
+                40,
+                40
+            ]
+        },
+        {
+            "pos": [
+                119,
+                643
+            ],
+            "size": [
+                40,
+                40
+            ]
+        },
+        {
+            "pos": [
+                904,
+                642
+            ],
+            "size": [
+                40,
+                40
+            ]
+        }
+    ],
+    "actors": [
+        {
+            "pos": [
+                246,
+                300
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                302,
+                308
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                152,
+                460
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                379,
+                510
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                349,
+                582
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                627,
+                263
+            ],
+            "type": "Patient",
+            "speed": 0.0,
+            "constraints": {
+                "needs_guidance": true
+            },
+            "guided_speeds": {
+                "adult": 0.75,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                680,
+                264
+            ],
+            "type": "Patient",
+            "speed": 0.0,
+            "constraints": {
+                "needs_guidance": true
+            },
+            "guided_speeds": {
+                "adult": 0.75,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                559,
+                583
+            ],
+            "type": "Patient",
+            "speed": 0.0,
+            "constraints": {
+                "needs_guidance": true
+            },
+            "guided_speeds": {
+                "adult": 0.75,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                326,
+                598
+            ],
+            "type": "Patient",
+            "speed": 0.0,
+            "constraints": {
+                "needs_guidance": true
+            },
+            "guided_speeds": {
+                "adult": 0.75,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                677,
+                606
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                699,
+                562
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                722,
+                588
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                684,
+                305
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                359,
+                277
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                335,
+                434
+            ],
+            "type": "Child",
+            "speed": 0.33,
+            "constraints": {},
+            "guided_speeds": {
+                "adult": 1.0,
+                "staff": 1.0
+            }
+        },
+        {
+            "pos": [
+                602,
+                286
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                780,
+                244
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                742,
+                483
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                850,
+                433
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                586,
+                598
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                415,
+                353
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                468,
+                343
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                353,
+                441
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                318,
+                532
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                252,
+                537
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                445,
+                562
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                653,
+                542
+            ],
+            "type": "Adult",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true,
+                "follows_staff": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                638,
+                304
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                598,
+                486
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        },
+        {
+            "pos": [
+                717,
+                461
+            ],
+            "type": "Staff",
+            "speed": 1.0,
+            "constraints": {
+                "knows_exit": true
+            },
+            "guided_speeds": {}
+        }
+    ],
+    "fires": [
+        {
+            "pos": [
+                500,
+                415
+            ]
+        },
+        {
+            "pos": [
+                515,
+                405
+            ]
+        },
+        {
+            "pos": [
+                515,
+                420
+            ]
+        }
+    ]
+}
