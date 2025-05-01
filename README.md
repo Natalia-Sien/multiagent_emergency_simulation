@@ -17,7 +17,7 @@ Algorithms files:
 greedy_algorithm.py
 algorithms.py (a-star and Dijkstra)
 fsm.py
-BoidsFlocking_Version3.py
+BoidsFlocking
 
 Evaluation files:
 auto_running_of_simulations.py
